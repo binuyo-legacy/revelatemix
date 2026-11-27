@@ -2,15 +2,15 @@
 
 import os
 
-from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QAction, QLabel, QMainWindow, QMenuBar, QStatusBar, QTabWidget,
     QVBoxLayout, QWidget,
 )
 
 from . import theme
-from .panels import EditorPanel, MixerPanel, TransportBar
+from .panels import EditorPanel, MixerPanel, TransportBar, scaled_logo_pixmap
 
 ASSETS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets"))
 
@@ -41,13 +41,13 @@ class MainWindow(QMainWindow):
     def _set_icon(self):
         # Transparent-background logo for the window/taskbar icon, same size
         # as the inline menu-bar logo so both read as one brand mark.
+        # Loads assets/logo.png fresh each launch (no cached derivative),
+        # so a replacement PNG is picked up unchanged.
         path = os.path.join(ASSETS_DIR, "logo.png")
         if os.path.exists(path):
-            pix = QPixmap(path)
+            pix = scaled_logo_pixmap(path, 64, 64)
             if not pix.isNull():
-                pix = pix.scaled(QSize(64, 64), Qt.KeepAspectRatio,
-                                 Qt.SmoothTransformation)
-            self.setWindowIcon(QIcon(pix))
+                self.setWindowIcon(QIcon(pix))
 
     def _build_menus(self):
         menu_bar = QMenuBar(self)
@@ -62,18 +62,17 @@ class MainWindow(QMainWindow):
         # Left padding on the bar reserves the space so File/Edit/Help start
         # after the logo. The bar height grows with the logo so the row
         # never overflows. No text label beside the logo.
+        # The source is read fresh every launch (no cached derivative in
+        # the repo), so a new higher-quality PNG export dropped in as
+        # assets/logo.png is used unchanged; scaled_logo_pixmap shrinks it
+        # smoothly (stepwise SmoothTransformation + device pixel ratio).
         logo_path = os.path.join(ASSETS_DIR, "logo.png")
-        logo_pix = QPixmap(logo_path)
+        logo_pix = scaled_logo_pixmap(logo_path, 68, 30)
         if not logo_pix.isNull():
         # Target roughly the height of the menu text at default DPI so it
         # reads as inline with File/Edit/Help. The bar is too short before
         # layout to trust its height(), so anchor directly: 30px is the
         # default text line height in the bar (padding + cap height).
-            target_h = 30
-            scale = logo_pix.width() / float(max(1, logo_pix.height()))
-            logo_pix = logo_pix.scaled(
-                QSize(int(target_h * scale), target_h),
-                Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label = QLabel(menu_bar)
             logo_label.setPixmap(logo_pix)
             logo_label.setToolTip("RevelateMix")

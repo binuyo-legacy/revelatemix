@@ -11,9 +11,9 @@ Plus a Master lane at the bottom. No placeholder text blocks.
 import math
 import os
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import (
-    QColor, QLinearGradient, QPainter, QPainterPath, QPen,
+    QColor, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
 )
 from PyQt5.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton,
@@ -21,6 +21,51 @@ from PyQt5.QtWidgets import (
 )
 
 from . import theme
+
+# ---------------------------------------------------------------- logo
+
+
+def scaled_logo_pixmap(path, target_w, target_h, device_ratio=1.0):
+    """Load assets/logo.png fresh and downscale it smoothly for a small target.
+
+    A single SmoothTransformation shrink from a large logo (e.g. 496x219
+    down to ~68x30 in the menu bar) still softens the wordmark: Qt's single
+    pass has to average very many source pixels per destination pixel.
+    Halving the pixmap step by step (each step with SmoothTransformation)
+    keeps more detail at the final size, the same trick image editors use
+    for small exports. The result is painted at a device pixel ratio so
+    labels on scaled/displays with a logical-to-device ratio above 1 do not
+    get stretched back up. Nothing is cached here: callers pass the file
+    path, so a new higher-quality PNG dropped in as assets/logo.png is
+    picked up on the next launch with no code change.
+    """
+    pix = QPixmap(path)
+    if pix.isNull():
+        return pix
+    target_size = QSize(
+        int(round(target_w)), int(round(target_h)))
+    if pix.size() != target_size:
+        current = pix
+        while (current.width() > target_w * 2
+               or current.height() > target_h * 2):
+            current = current.scaled(
+                max(1, current.width() // 2),
+                max(1, current.height() // 2),
+                Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        current = current.scaled(
+            target_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pix = current
+    if device_ratio and device_ratio > 1.0:
+        # Paint at device resolution but present at the logical size: the
+        # label keeps showing target_w x target_h, the pixels stay sharp.
+        sharp = QPixmap(pix.size() * device_ratio)
+        sharp.setDevicePixelRatio(device_ratio)
+        painter = QPainter(sharp)
+        painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        painter.drawPixmap(0, 0, pix)
+        painter.end()
+        pix = sharp
+    return pix
 
 
 # ---------------------------------------------------------------- widgets
@@ -579,12 +624,9 @@ class Header(QWidget):
         for name in ("logo.png", "logo.jpg"):
             path = os.path.normpath(os.path.join(here, "..", "assets", name))
             if os.path.exists(path):
-                from PyQt5.QtGui import QPixmap
-                pixmap = QPixmap(path)
-                if not pixmap.isNull():
-                    return pixmap.scaled(
-                        120, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        from PyQt5.QtGui import QPixmap
+                pix = scaled_logo_pixmap(path, 120, 56)
+                if not pix.isNull():
+                    return pix
         placeholder = QPixmap(120, 56)
         placeholder.fill(0x1a1a1a)
         return placeholder
