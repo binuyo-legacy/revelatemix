@@ -1,0 +1,2 @@
+PyQt5>=5.12
+# Python 3.8 32-bit on Windows. No audio backend yet (v0.1 skeleton).
