@@ -1,8 +1,11 @@
-"""Mixer channel strips, Editor panels, hardware transport, header.
+"""Mixer track lanes, Editor panels, hardware transport, header.
 
-UI only, no audio logic. Layout: channel strip per track (Tracks 1-4) plus a
-Master strip on the right of the Mixer tab. No placeholder text blocks, no
-"coming later" copy inside the UI. Panels look finished and compact.
+UI only, no audio logic. Mixer tab layout (v0.1.2, MixPad-inspired):
+tracks stacked as horizontal lanes top-to-bottom, each lane a compact
+row with track name, M/S/A buttons, horizontal volume slider, pan
+control and a waveform/lane area taking the rest of the width, so the
+whole project is visible at a glance on a small laptop screen.
+Plus a Master lane at the bottom. No placeholder text blocks.
 """
 
 import math
@@ -28,9 +31,9 @@ class PanKnob(QWidget):
     Pure Qt painting, no dependencies. Value is -1.0 (L) .. +1.0 (R).
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, size=44, parent=None):
         super().__init__(parent)
-        self.setFixedSize(44, 44)
+        self.setFixedSize(size, size)
         self.setCursor(Qt.PointingHandCursor)
         self.value = 0.0
         self._drag_y = None
@@ -143,22 +146,47 @@ class LedMeter(QWidget):
         p.end()
 
 
+class HorizontalLedMeter(QWidget):
+    """Thin horizontal LED meter for a track lane (0..1 level, UI only)."""
+
+    SEGMENTS = 16
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(10)
+        self.setMinimumWidth(80)
+        self.level = 0.62
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, h = self.width(), self.height()
+        gap = 2
+        seg_w = (w - gap * (self.SEGMENTS - 1)) / float(self.SEGMENTS)
+        lit = int(round(self.level * self.SEGMENTS))
+        for i in range(self.SEGMENTS):
+            x = i * (seg_w + gap)
+            if i >= 13:
+                on = QColor("#ff5a3c")
+            elif i >= 10:
+                on = QColor(theme.GOLD)
+            else:
+                on = QColor(theme.LED_GREEN)
+            off = QColor("#1e1e1e")
+            p.setPen(QPen(QColor(theme.BORDER_SOFT), 1))
+            p.setBrush(on if i < lit else off)
+            path = QPainterPath()
+            path.addRoundedRect(int(x), 1, int(seg_w), h - 2, 2, 2)
+            p.drawPath(path)
+        p.end()
+
+
 def _toggle_button(text, object_name, tooltip):
     btn = QPushButton(text)
     btn.setObjectName("StripToggle")
     btn.setProperty("object_name", object_name)
     btn.setCheckable(True)
     btn.setToolTip(tooltip)
-    # per-button object name via style hook: subclass trick not needed, the
-    # stylesheet keys off #MuteBtn/#SoloBtn/#ArmBtn, so set objectName to the
-    # combined id in addition: Qt allows only one objectName, so we keep
-    # StripToggle for sizing and overlay the id by a second name is not
-    # possible. Instead we give the button its real id and add a common
-    # class via a subclass-free approach: set objectName to the specific id
-    # and rely on the shared StripToggle rules not being needed (they are
-    # duplicated in the specific selectors below via "StripToggle" only).
-    # To keep the stylesheet in theme.py authoritative we simply keep
-    # objectName="StripToggle" and set the active colour inline when toggled.
     btn.toggled.connect(lambda on, b=btn: _apply_toggle_colour(b, on))
     return btn
 
@@ -186,102 +214,196 @@ def _apply_toggle_colour(btn, on):
     btn.style().polish(btn)
 
 
-class ChannelStrip(QFrame):
-    """One vertical mixer channel: label, meter, pan knob, fader, M/S/A."""
+class LaneWaveform(QWidget):
+    """Empty waveform/lane area: dark inset panel with centre line + grid."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("InsetPanel")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setMinimumWidth(120)
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        # dark inset background
+        grad = QLinearGradient(0, 0, 0, self.height())
+        grad.setColorAt(0, QColor(theme.INNER_SHADOW))
+        grad.setColorAt(0.4, QColor(theme.BG_DEEP))
+        grad.setColorAt(1, QColor(theme.PANEL))
+        p.setBrush(grad)
+        p.setPen(QPen(QColor(theme.BORDER_SOFT), 1))
+        path = QPainterPath()
+        path.addRoundedRect(1, 1, self.width() - 2, self.height() - 2, 5, 5)
+        p.drawPath(path)
+        # faint vertical grid (one tick per second, UI only)
+        p.setPen(QPen(QColor(theme.BORDER_SOFT), 1))
+        step = max(24, self.width() // 12)
+        x = step
+        while x < self.width():
+            p.drawLine(x, 4, x, self.height() - 4)
+            x += step
+        # centre line, gold-dim
+        mid = self.height() // 2
+        p.setPen(QPen(QColor(theme.GOLD_DARK), 1))
+        p.drawLine(4, mid, self.width() - 4, mid)
+        p.end()
+
+
+class TrackLane(QFrame):
+    """One horizontal track lane (MixPad-style):
+
+    [ name + M/S/A | volume slider | pan | meter ]  | waveform area
+    """
 
     def __init__(self, name, is_master=False, parent=None):
         super().__init__(parent)
         self.is_master = is_master
+        self.lane_name = name
         self.setObjectName("ConsolePanel")
-        self.setMinimumWidth(96 if not is_master else 112)
-        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        self.setMinimumHeight(62)
+        self.setMaximumHeight(76 if not is_master else 68)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        root = QHBoxLayout(self)
+        root.setContentsMargins(8, 6, 8, 6)
+        root.setSpacing(8)
 
-        # label
+        # ---- left control block (fixed width, stacked compactly) ----
+        controls = QVBoxLayout()
+        controls.setSpacing(3)
+        controls.setContentsMargins(0, 0, 0, 0)
+
+        # row 1: name + M/S/A
+        row1 = QHBoxLayout()
+        row1.setSpacing(4)
         label = QLabel(name)
-        label.setAlignment(Qt.AlignCenter)
         colour = theme.GOLD if is_master else theme.TEXT
-        weight = "bold" if is_master else "normal"
+        weight = "bold" if is_master else "bold"
         label.setStyleSheet(
-            "font-size: 9pt; font-weight: %s; color: %s; letter-spacing: 1px;"
+            "font-size: 9pt; font-weight: %s; color: %s;"
             % (weight, colour))
-        layout.addWidget(label)
+        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        row1.addWidget(label, 1)
 
-        # meter + fader row
-        mid = QHBoxLayout()
-        mid.setSpacing(6)
-        meter = LedMeter()
-        meter.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        mid.addWidget(meter)
-
-        fader = QSlider(Qt.Vertical)
-        fader.setRange(0, 100)
-        fader.setValue(80 if not is_master else 85)
-        fader.setFixedWidth(36)
-        fader.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        fader.setToolTip("Level")
-        mid.addWidget(fader)
-        layout.addLayout(mid, 1)
-
-        # pan knob + value
-        pan_row = QVBoxLayout()
-        pan_row.setSpacing(2)
-        pan_label = QLabel("PAN")
-        pan_label.setAlignment(Qt.AlignCenter)
-        pan_label.setStyleSheet(
-            "font-size: 7pt; color: %s; letter-spacing: 1px;" % theme.TEXT_FAINT)
-        pan_row.addWidget(pan_label)
-        knob = PanKnob()
-        knob_layout = QHBoxLayout()
-        knob_layout.setContentsMargins(0, 0, 0, 0)
-        knob_layout.addStretch(1)
-        knob_layout.addWidget(knob)
-        knob_layout.addStretch(1)
-        pan_row.addLayout(knob_layout)
-        layout.addLayout(pan_row)
-
-        # Mute / Solo / Arm
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(4)
         self.mute_btn = _toggle_button("M", "mute", "Mute")
         self.solo_btn = _toggle_button("S", "solo", "Solo")
         self.arm_btn = _toggle_button("A", "arm", "Arm for recording")
         for b in (self.mute_btn, self.solo_btn, self.arm_btn):
-            b.setFixedWidth(24)
-            btn_row.addWidget(b)
-        layout.addLayout(btn_row)
+            b.setFixedSize(26, 20)
+            row1.addWidget(b)
+        controls.addLayout(row1)
 
+        # row 2: volume slider (gold thumb via theme) + value-ish spacing
+        vol_row = QHBoxLayout()
+        vol_row.setSpacing(4)
+        vol_label = QLabel("VOL")
+        vol_label.setStyleSheet(
+            "font-size: 7pt; color: %s; letter-spacing: 1px;"
+            % theme.TEXT_FAINT)
+        vol_row.addWidget(vol_label)
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(85 if is_master else 80)
+        self.volume_slider.setToolTip("Volume")
+        vol_row.addWidget(self.volume_slider, 1)
+        controls.addLayout(vol_row)
 
-# ---------------------------------------------------------------- panels
+        # row 3: pan (small knob + pan slider for compact lane use)
+        pan_row = QHBoxLayout()
+        pan_row.setSpacing(4)
+        pan_label = QLabel("PAN")
+        pan_label.setStyleSheet(
+            "font-size: 7pt; color: %s; letter-spacing: 1px;"
+            % theme.TEXT_FAINT)
+        pan_row.addWidget(pan_label)
+        self.pan_knob = PanKnob(size=26)
+        pan_row.addWidget(self.pan_knob)
+        self.pan_slider = QSlider(Qt.Horizontal)
+        self.pan_slider.setRange(-50, 50)
+        self.pan_slider.setValue(0)
+        self.pan_slider.setToolTip("Pan (L-C-R)")
+        pan_row.addWidget(self.pan_slider, 1)
+        # keep knob + slider in sync, UI only
+        self.pan_slider.valueChanged.connect(self._on_pan_slider)
+        self.pan_knob.setValue(0.0)
+        controls.addLayout(pan_row)
 
-class MixerPanel(QWidget):
-    """Mixer tab: four track channel strips + Master strip on the right."""
+        control_box = QWidget()
+        control_box.setLayout(controls)
+        control_box.setFixedWidth(300)
+        control_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        root.addWidget(control_box)
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        root = QHBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(10)
-
-        self.strips = []
-        for i in range(1, 5):
-            strip = ChannelStrip("TRACK %d" % i, is_master=False)
-            self.strips.append(strip)
-            root.addWidget(strip)
-
-        # thin divider before Master
+        # thin vertical divider between controls and lane area
         divider = QFrame()
         divider.setFrameShape(QFrame.VLine)
         divider.setStyleSheet("background: %s; width: 1px;" % theme.BORDER_SOFT)
         root.addWidget(divider)
 
-        master = ChannelStrip("MASTER", is_master=True)
-        self.strips.append(master)
+        # ---- waveform / lane area (rest of the width) ----
+        right = QVBoxLayout()
+        right.setSpacing(3)
+        right.setContentsMargins(0, 0, 0, 0)
+        self.waveform = LaneWaveform()
+        right.addWidget(self.waveform, 1)
+        self.meter = HorizontalLedMeter()
+        right.addWidget(self.meter)
+        root.addLayout(right, 1)
+
+    def _on_pan_slider(self, value):
+        self.pan_knob.setValue(value / 50.0)
+
+
+# keep old name as alias so nothing importing ChannelStrip breaks
+ChannelStrip = TrackLane
+
+
+class MixerPanel(QWidget):
+    """Mixer tab: 4 stacked horizontal track lanes + Master lane below."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 8, 10, 10)
+        root.setSpacing(6)
+
+        # time ruler aligned with the waveform area (controls block is 300px)
+        ruler_row = QHBoxLayout()
+        ruler_row.setContentsMargins(0, 0, 0, 0)
+        spacer = QWidget()
+        spacer.setFixedWidth(308)  # 300 controls + margins/spacing
+        ruler_row.addWidget(spacer)
+        ruler = QLabel("0:00        0:01        0:02        0:03        "
+                       "0:04        0:05        0:06        0:07        0:08")
+        ruler.setStyleSheet(
+            "font-size: 7pt; color: %s; letter-spacing: 1px;"
+            % theme.TEXT_FAINT)
+        ruler_row.addWidget(ruler, 1)
+        root.addLayout(ruler_row)
+
+        self.lanes = []
+        for i in range(1, 5):
+            lane = TrackLane("Untitled Track %d" % i, is_master=False)
+            self.lanes.append(lane)
+            root.addWidget(lane)
+
+        # divider above Master
+        divider = QFrame()
+        divider.setFrameShape(QFrame.HLine)
+        divider.setStyleSheet(
+            "background: %s; height: 1px; margin: 2px 0;" % theme.BORDER_SOFT)
+        root.addWidget(divider)
+
+        master = TrackLane("Master", is_master=True)
+        self.lanes.append(master)
         root.addWidget(master)
+
         root.addStretch(1)
+
+    # backward-compat alias used by older code/tests
+    @property
+    def strips(self):
+        return self.lanes
 
 
 class _EditorInset(QFrame):
@@ -416,7 +538,12 @@ class TransportBar(QWidget):
 
 
 class Header(QWidget):
-    """Top header: logo, app name, version badge."""
+    """Legacy top header: logo, app name, version badge.
+
+    Kept for import compatibility but no longer added to the main window
+    (v0.1.2: Mixer/Editor tabs sit directly under the menu bar, the logo
+    still lives on as the window/taskbar icon from assets/logo.png).
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -439,7 +566,7 @@ class Header(QWidget):
 
         layout.addStretch(1)
 
-        version = QLabel("v0.1  ·  CONSOLE")
+        version = QLabel("v0.1.2  ·  LANES")
         version.setStyleSheet(
             "font-size: 8pt; letter-spacing: 2px; color: %s;"
             " border: 1px solid %s; border-radius: 10px; padding: 4px 12px;"
