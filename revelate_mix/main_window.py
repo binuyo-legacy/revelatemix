@@ -15,7 +15,7 @@ ASSETS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__fil
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("RevelateMix v0.1")
+        self.setWindowTitle("RevelateMix v0.1.1")
         self.setMinimumSize(900, 600)
         self._set_icon()
 
@@ -63,14 +63,14 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self):
         status = QStatusBar(self)
         self.setStatusBar(status)
-        status.showMessage("RevelateMix v0.1 skeleton. UI only, no audio yet.")
+        status.showMessage("RevelateMix v0.1.1 skeleton. UI only, no audio yet.")
 
     def _not_yet(self):
-        self.statusBar().showMessage("Not in the skeleton yet. Audio comes after the layout is approved.")
+        self.statusBar().showMessage("Audio comes after the layout is approved.")
 
     def _about(self):
         self.statusBar().showMessage(
-            "RevelateMix v0.1. Charcoal + gold skeleton. Mixer and Editor tabs, transport bar. No audio logic yet.")
+            "RevelateMix v0.1.1. Charcoal + gold console. Mixer and Editor tabs, hardware transport. No audio logic yet.")
 
 
 def main():
