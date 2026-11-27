@@ -2,10 +2,11 @@
 
 import os
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import (
-    QAction, QMainWindow, QMenuBar, QStatusBar, QTabWidget, QVBoxLayout, QWidget, QLabel,
+    QAction, QLabel, QMainWindow, QMenuBar, QStatusBar, QTabWidget,
+    QVBoxLayout, QWidget,
 )
 
 from . import theme
@@ -38,25 +39,53 @@ class MainWindow(QMainWindow):
         self._build_statusbar()
 
     def _set_icon(self):
+        # Transparent-background logo for the window/taskbar icon, same size
+        # as the inline menu-bar logo so both read as one brand mark.
         path = os.path.join(ASSETS_DIR, "logo.png")
         if os.path.exists(path):
-            self.setWindowIcon(QIcon(QPixmap(path)))
+            pix = QPixmap(path)
+            if not pix.isNull():
+                pix = pix.scaled(QSize(64, 64), Qt.KeepAspectRatio,
+                                 Qt.SmoothTransformation)
+            self.setWindowIcon(QIcon(pix))
 
     def _build_menus(self):
         menu_bar = QMenuBar(self)
         self.setMenuBar(menu_bar)
 
-        # Inline app logo: textless icon action as first item in the menu bar,
-        # small enough to fit the menu row. No label next to it. Clicking it
-        # just shows the About/status note (UI only, no audio).
+        # Inline app logo: transparent-background logo as first item in the
+        # menu bar, sized to sit on the same line as File/Edit/Help.
+        # The label is a child widget of the menu bar itself (not an action
+        # icon): QMenuBar paints action icons at the small-icon size, which
+        # shrank the wide logo into a 16px smudge. A child label paints at
+        # its own size, so we anchor its height to the menu bar's height.
+        # Left padding on the bar reserves the space so File/Edit/Help start
+        # after the logo. The bar height grows with the logo so the row
+        # never overflows. No text label beside the logo.
         logo_path = os.path.join(ASSETS_DIR, "logo.png")
-        if os.path.exists(logo_path):
-            logo_pix = QPixmap(logo_path).scaled(
-                36, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            logo_action = QAction(QIcon(logo_pix), "", self)
-            logo_action.setToolTip("RevelateMix")
-            logo_action.triggered.connect(self._about)
-            menu_bar.addAction(logo_action)
+        logo_pix = QPixmap(logo_path)
+        if not logo_pix.isNull():
+        # Target roughly the height of the menu text at default DPI so it
+        # reads as inline with File/Edit/Help. The bar is too short before
+        # layout to trust its height(), so anchor directly: 30px is the
+        # default text line height in the bar (padding + cap height).
+            target_h = 30
+            scale = logo_pix.width() / float(max(1, logo_pix.height()))
+            logo_pix = logo_pix.scaled(
+                QSize(int(target_h * scale), target_h),
+                Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_label = QLabel(menu_bar)
+            logo_label.setPixmap(logo_pix)
+            logo_label.setToolTip("RevelateMix")
+            logo_label.setAlignment(Qt.AlignCenter)
+            logo_label.setGeometry(2, 4, logo_pix.width(), logo_pix.height())
+            logo_label.show()
+            # Reserve the logo's width as left padding so menus start after
+            # it, and grow the bar so the row fits the logo vertically.
+            menu_bar.setStyleSheet(
+                theme.STYLESHEET + "\nQMenuBar { padding-left: %dpx; }" %
+                (logo_pix.width() + 8))
+            menu_bar.setFixedHeight(logo_pix.height() + 8)
 
         file_menu = menu_bar.addMenu("&File")
         file_menu.addAction("New project", self._not_yet)
