@@ -18,7 +18,7 @@ ASSETS_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__fil
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("RevelateMix v0.1.3")
+        self.setWindowTitle("RevelateMix v0.1.6")
         self.setMinimumSize(900, 600)
         self._set_icon()
 
@@ -39,10 +39,10 @@ class MainWindow(QMainWindow):
         self._build_statusbar()
 
     def _set_icon(self):
-        # Transparent-background logo for the window/taskbar icon, same size
-        # as the inline menu-bar logo so both read as one brand mark.
-        # Loads assets/logo.png fresh each launch (no cached derivative),
-        # so a replacement PNG is picked up unchanged.
+        # Window/taskbar icon stays the FULL original logo (icon + wordmark):
+        # assets/logo.png, the user's design from v0.1.4, restored here.
+        # Loads it fresh each launch (no cached derivative), so a
+        # replacement PNG is picked up unchanged.
         path = os.path.join(ASSETS_DIR, "logo.png")
         if os.path.exists(path):
             pix = scaled_logo_pixmap(path, 64, 64)
@@ -53,8 +53,12 @@ class MainWindow(QMainWindow):
         menu_bar = QMenuBar(self)
         self.setMenuBar(menu_bar)
 
-        # Inline app logo: transparent-background logo as first item in the
-        # menu bar, sized to sit on the same line as File/Edit/Help.
+        # Inline app logo: the gold audio-bars icon mark ONLY (no wordmark
+        # text), as first item in the menu bar before File/Edit/Help.
+        # Source is assets/logo_icon.png, cropped from the user's original
+        # full logo (v0.1.4) without touching the artwork: the left
+        # audio-bars mark, alpha-trimmed. The full original logo stays as
+        # the window/taskbar icon via _set_icon().
         # The label is a child widget of the menu bar itself (not an action
         # icon): QMenuBar paints action icons at the small-icon size, which
         # shrank the wide logo into a 16px smudge. A child label paints at
@@ -62,12 +66,10 @@ class MainWindow(QMainWindow):
         # Left padding on the bar reserves the space so File/Edit/Help start
         # after the logo. The bar height grows with the logo so the row
         # never overflows. No text label beside the logo.
-        # The source is read fresh every launch (no cached derivative in
-        # the repo), so a new higher-quality PNG export dropped in as
-        # assets/logo.png is used unchanged; scaled_logo_pixmap shrinks it
-        # smoothly (stepwise SmoothTransformation + device pixel ratio).
-        logo_path = os.path.join(ASSETS_DIR, "logo.png")
-        logo_pix = scaled_logo_pixmap(logo_path, 68, 30)
+        # scaled_logo_pixmap shrinks it smoothly (stepwise
+        # SmoothTransformation + device pixel ratio).
+        logo_path = os.path.join(ASSETS_DIR, "logo_icon.png")
+        logo_pix = scaled_logo_pixmap(logo_path, 26, 26)
         if not logo_pix.isNull():
         # Target roughly the height of the menu text at default DPI so it
         # reads as inline with File/Edit/Help. The bar is too short before
@@ -103,14 +105,14 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self):
         status = QStatusBar(self)
         self.setStatusBar(status)
-        status.showMessage("RevelateMix v0.1.3 skeleton. UI only, no audio yet.")
+        status.showMessage("RevelateMix v0.1.6 skeleton. UI only, no audio yet.")
 
     def _not_yet(self):
         self.statusBar().showMessage("Audio comes after the layout is approved.")
 
     def _about(self):
         self.statusBar().showMessage(
-            "RevelateMix v0.1.3. Charcoal + gold console. Mixer track lanes, Editor tab, hardware transport. No audio logic yet.")
+            "RevelateMix v0.1.6. Charcoal + gold console. Mixer track lanes, Editor tab, hardware transport. No audio logic yet.")
 
 
 def main():
