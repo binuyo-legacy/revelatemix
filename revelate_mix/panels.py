@@ -371,9 +371,15 @@ class TrackLane(QFrame):
             row1.addWidget(b)
         controls.addLayout(row1)
 
-        # row 2: volume slider (gold thumb via theme) + value-ish spacing
+        # row 2: volume slider (gold thumb via theme) + value-ish spacing.
+        # The slider is capped at 140px and a right-hand spacer reserves the
+        # M/S/A column width so the groove/thumb can never run underneath
+        # the buttons on any window size (v0.1.8 fix). Windows font metrics
+        # make the label wider than on Linux, so the cap is deliberately
+        # generous and the reserved width is explicit, not guessed.
         vol_row = QHBoxLayout()
         vol_row.setSpacing(4)
+        vol_row.setContentsMargins(0, 0, 0, 0)
         vol_label = _painted(QLabel("VOL"))
         vol_label.setStyleSheet(
             "font-size: 7pt; color: %s; letter-spacing: 1px;"
@@ -383,12 +389,24 @@ class TrackLane(QFrame):
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(85 if is_master else 80)
         self.volume_slider.setToolTip("Volume")
-        vol_row.addWidget(self.volume_slider, 1)
+        self.volume_slider.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.volume_slider.setFixedWidth(140)
+        vol_row.addWidget(self.volume_slider)
+        # reserve the M/S/A button column (3 x 26px + 2 x 4px spacing)
+        vol_reserve = _painted(QWidget())
+        vol_reserve.setFixedSize(86, 1)
+        vol_reserve.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        vol_row.addWidget(vol_reserve)
+        vol_row.addStretch(1)  # push the M/S/A-aligned reserve to the right edge
         controls.addLayout(vol_row)
 
-        # row 3: pan (small knob + pan slider for compact lane use)
+        # row 3: pan (small knob + pan slider for compact lane use).
+        # Same rule as VOL: the pan slider is capped and a reserved spacer
+        # keeps it clear of the M/S/A column (v0.1.8 fix).
         pan_row = QHBoxLayout()
         pan_row.setSpacing(4)
+        pan_row.setContentsMargins(0, 0, 0, 0)
         pan_label = _painted(QLabel("PAN"))
         pan_label.setStyleSheet(
             "font-size: 7pt; color: %s; letter-spacing: 1px;"
@@ -400,7 +418,16 @@ class TrackLane(QFrame):
         self.pan_slider.setRange(-50, 50)
         self.pan_slider.setValue(0)
         self.pan_slider.setToolTip("Pan (L-C-R)")
-        pan_row.addWidget(self.pan_slider, 1)
+        self.pan_slider.setSizePolicy(
+            QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.pan_slider.setFixedWidth(110)
+        pan_row.addWidget(self.pan_slider)
+        # reserve the M/S/A button column on the right of the pan slider
+        pan_reserve = _painted(QWidget())
+        pan_reserve.setFixedSize(86, 1)
+        pan_reserve.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        pan_row.addWidget(pan_reserve)
+        pan_row.addStretch(1)
         # keep knob + slider in sync, UI only
         self.pan_slider.valueChanged.connect(self._on_pan_slider)
         self.pan_knob.setValue(0.0)
@@ -408,7 +435,7 @@ class TrackLane(QFrame):
 
         control_box = _painted(QWidget())
         control_box.setLayout(controls)
-        control_box.setFixedWidth(300)
+        control_box.setFixedWidth(320)
         control_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         root.addWidget(control_box)
 
@@ -452,7 +479,7 @@ class MixerPanel(QWidget):
         ruler_row = QHBoxLayout()
         ruler_row.setContentsMargins(0, 0, 0, 0)
         spacer = _painted(QWidget())
-        spacer.setFixedWidth(308)  # 300 controls + margins/spacing
+        spacer.setFixedWidth(328)  # 320 controls + margins/spacing
         ruler_row.addWidget(spacer)
         ruler = _painted(QLabel(
             "0:00        0:01        0:02        0:03        "

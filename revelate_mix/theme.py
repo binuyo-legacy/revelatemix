@@ -114,6 +114,9 @@ QTabWidget::pane {{
         stop:0 {PANEL}, stop:1 {BG_DEEP});
     margin-top: -1px;
 }}
+QTabBar {{
+    padding-top: 5px;
+}}
 QTabBar::tab {{
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 {PANEL_LIGHT}, stop:1 {PANEL});
@@ -122,8 +125,11 @@ QTabBar::tab {{
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
-    padding: 8px 24px;
-    margin-right: 4px;
+    padding: 12px 30px;
+    min-width: 120px;
+    min-height: 32px;
+    margin-right: 6px;
+    margin-left: 2px;
     font-size: 10pt;
     font-weight: bold;
 }}
@@ -232,10 +238,10 @@ QSlider::groove:horizontal {{
     border: 1px solid {BORDER_SOFT}; border-radius: 3px;
 }}
 QSlider::handle:horizontal {{
-    width: 16px; height: 16px;
+    width: 14px; height: 14px;
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 {GOLD_LIGHT}, stop:0.5 {GOLD}, stop:1 {GOLD_DARK});
-    border: 1px solid {GOLD_DARK}; border-radius: 8px; margin: -6px 0;
+    border: 1px solid {GOLD_DARK}; border-radius: 7px; margin: -5px 0;
 }}
 QSlider::sub-page:horizontal {{ background: {GOLD_DARK}; border-radius: 3px; }}
 QSlider::groove:vertical {{
