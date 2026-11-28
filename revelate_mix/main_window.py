@@ -123,7 +123,9 @@ def main():
     app.setApplicationName("RevelateMix")
     app.setOrganizationName("Binuyo Legacy")
     app.setStyle("Fusion")
-    app.setStyleSheet(theme.STYLESHEET)
+    # Dark palette + stylesheet: no widget can render default light/white
+    # on Windows, including the mixer lane control containers.
+    theme.apply_app_theme(app)
 
     window = MainWindow()
     window.show()

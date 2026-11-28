@@ -28,9 +28,55 @@ SOLO_GREEN = "#3fae5a"
 MUTE_AMBER = "#d98a2b"
 ARM_RED = "#e0442e"
 
+
+def apply_app_theme(app):
+    """Apply the charcoal + gold theme so NO widget can fall back to a
+    default light/white palette. Two layers, both dark:
+
+    1. A dark QPalette: the Windows style engine paints every widget
+       that has no stylesheet background (empty container widgets with
+       no autoFillBackground, and any control a stylesheet rule misses)
+       from the palette. With the default light palette those canvases
+       render as default white/light on Windows; dark on Linux because
+       the offscreen plugin does not repaint them.
+    2. The full STYLESHEET on the application object.
+
+    Track lanes, labels, VOL/PAN sliders, M/S/A buttons, the Master
+    section, Editor panels and transport all pick this up because the
+    stylesheet is applied app-wide and the palette sits underneath.
+    """
+    from PyQt5.QtGui import QBrush, QColor, QPalette
+
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor(BG))
+    palette.setColor(QPalette.WindowText, QColor(TEXT))
+    palette.setColor(QPalette.Base, QColor(BG_DEEP))
+    palette.setColor(QPalette.AlternateBase, QColor(PANEL))
+    palette.setColor(QPalette.Text, QColor(TEXT))
+    palette.setColor(QPalette.Button, QColor(PANEL_LIGHT))
+    palette.setColor(QPalette.ButtonText, QColor(TEXT))
+    palette.setColor(QPalette.Highlight, QColor(GOLD_DARK))
+    palette.setColor(QPalette.HighlightedText, QColor("#101010"))
+    palette.setColor(QPalette.ToolTipBase, QColor(PANEL_LIGHT))
+    palette.setColor(QPalette.ToolTipText, QColor(TEXT))
+    palette.setColor(QPalette.Disabled, QPalette.WindowText, QColor(TEXT_FAINT))
+    palette.setColor(QPalette.Disabled, QPalette.Text, QColor(TEXT_FAINT))
+    palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(TEXT_FAINT))
+    palette.setBrush(QPalette.Midlight, QBrush(QColor(PANEL_HI)))
+    palette.setBrush(QPalette.Mid, QBrush(QColor(BORDER)))
+    palette.setBrush(QPalette.Dark, QBrush(QColor(BORDER_SOFT)))
+    palette.setBrush(QPalette.Shadow, QBrush(QColor(INNER_SHADOW)))
+    palette.setBrush(QPalette.Active, QPalette.Window, QBrush(QColor(BG)))
+    palette.setBrush(QPalette.Inactive, QPalette.Window, QBrush(QColor(BG)))
+    palette.setBrush(QPalette.Disabled, QPalette.Window, QBrush(QColor(BG)))
+    app.setPalette(palette)
+    app.setStyleSheet(STYLESHEET)
+    return app
+
 STYLESHEET = f"""
 * {{ color: {TEXT}; font-family: "Segoe UI", "Segoe UI Symbol", sans-serif; }}
-QMainWindow, QTabWidget::pane, QWidget {{ background: {BG}; }}
+QMainWindow, QWidget, QFrame, QLabel, QTabWidget::pane, QScrollArea,
+QDialog, QMenuBar, QStatusBar, QToolBar, QComboBox, QLineEdit {{ background: {BG}; }}
 QMainWindow::separator {{ background: {BORDER_SOFT}; height: 1px; }}
 
 /* ---- menu bar + menus: fully dark, no Windows grey ---- */

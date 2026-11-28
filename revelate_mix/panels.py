@@ -22,6 +22,34 @@ from PyQt5.QtWidgets import (
 
 from . import theme
 
+def _painted(widget):
+    """Force a widget to paint its stylesheet background on every platform.
+
+    Qt only paints a widget's stylesheet background if the widget has
+    autoFillBackground set (or WA_StyledBackground). Pure container widgets
+    (QWidget/QFrame without a paintEvent) can otherwise stay unpainted and
+    the Windows style engine falls back to the default light/white window
+    background, while Linux's offscreen plugin leaves them transparent over
+    the dark parent. That is the v0.1.6 regression on the mixer lanes: the
+    stylesheet was intact but the empty lane/control containers fell back
+    to default white on Windows with default blue slider styling. Marking
+    every container here, plus the dark QPalette from theme.apply_app_theme,
+    guarantees charcoal everywhere.
+    """
+    widget.setAttribute(Qt.WA_StyledBackground, True)
+    widget.setAutoFillBackground(True)
+    return widget
+
+def _paint_tree(widget):
+    """Mark every descendant as styled-background + auto-fill."""
+    from PyQt5.QtWidgets import QWidget as _W
+    _painted(widget)
+    for child in widget.findChildren(_W):
+        child.setAttribute(Qt.WA_StyledBackground, True)
+        child.setAutoFillBackground(True)
+    return widget
+
+
 # ---------------------------------------------------------------- logo
 
 
@@ -80,6 +108,7 @@ class PanKnob(QWidget):
         super().__init__(parent)
         self.setFixedSize(size, size)
         self.setCursor(Qt.PointingHandCursor)
+        _painted(self)
         self.value = 0.0
         self._drag_y = None
         self._drag_start_value = 0.0
@@ -162,6 +191,7 @@ class LedMeter(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        _painted(self)
         self.setFixedWidth(10)
         self.setMinimumHeight(120)
         self.level = 0.62  # static UI demo level, no audio
@@ -198,6 +228,7 @@ class HorizontalLedMeter(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        _painted(self)
         self.setFixedHeight(10)
         self.setMinimumWidth(80)
         self.level = 0.62
@@ -265,6 +296,7 @@ class LaneWaveform(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("InsetPanel")
+        _painted(self)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setMinimumWidth(120)
 
@@ -305,6 +337,7 @@ class TrackLane(QFrame):
         self.is_master = is_master
         self.lane_name = name
         self.setObjectName("ConsolePanel")
+        _painted(self)
         self.setMinimumHeight(62)
         self.setMaximumHeight(76 if not is_master else 68)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -321,7 +354,7 @@ class TrackLane(QFrame):
         # row 1: name + M/S/A
         row1 = QHBoxLayout()
         row1.setSpacing(4)
-        label = QLabel(name)
+        label = _painted(QLabel(name))
         colour = theme.GOLD if is_master else theme.TEXT
         weight = "bold" if is_master else "bold"
         label.setStyleSheet(
@@ -341,7 +374,7 @@ class TrackLane(QFrame):
         # row 2: volume slider (gold thumb via theme) + value-ish spacing
         vol_row = QHBoxLayout()
         vol_row.setSpacing(4)
-        vol_label = QLabel("VOL")
+        vol_label = _painted(QLabel("VOL"))
         vol_label.setStyleSheet(
             "font-size: 7pt; color: %s; letter-spacing: 1px;"
             % theme.TEXT_FAINT)
@@ -356,7 +389,7 @@ class TrackLane(QFrame):
         # row 3: pan (small knob + pan slider for compact lane use)
         pan_row = QHBoxLayout()
         pan_row.setSpacing(4)
-        pan_label = QLabel("PAN")
+        pan_label = _painted(QLabel("PAN"))
         pan_label.setStyleSheet(
             "font-size: 7pt; color: %s; letter-spacing: 1px;"
             % theme.TEXT_FAINT)
@@ -373,14 +406,14 @@ class TrackLane(QFrame):
         self.pan_knob.setValue(0.0)
         controls.addLayout(pan_row)
 
-        control_box = QWidget()
+        control_box = _painted(QWidget())
         control_box.setLayout(controls)
         control_box.setFixedWidth(300)
         control_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         root.addWidget(control_box)
 
         # thin vertical divider between controls and lane area
-        divider = QFrame()
+        divider = _painted(QFrame())
         divider.setFrameShape(QFrame.VLine)
         divider.setStyleSheet("background: %s; width: 1px;" % theme.BORDER_SOFT)
         root.addWidget(divider)
@@ -395,6 +428,8 @@ class TrackLane(QFrame):
         right.addWidget(self.meter)
         root.addLayout(right, 1)
 
+        _paint_tree(self)
+
     def _on_pan_slider(self, value):
         self.pan_knob.setValue(value / 50.0)
 
@@ -408,6 +443,7 @@ class MixerPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        _painted(self)
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 8, 10, 10)
         root.setSpacing(6)
@@ -415,11 +451,12 @@ class MixerPanel(QWidget):
         # time ruler aligned with the waveform area (controls block is 300px)
         ruler_row = QHBoxLayout()
         ruler_row.setContentsMargins(0, 0, 0, 0)
-        spacer = QWidget()
+        spacer = _painted(QWidget())
         spacer.setFixedWidth(308)  # 300 controls + margins/spacing
         ruler_row.addWidget(spacer)
-        ruler = QLabel("0:00        0:01        0:02        0:03        "
-                       "0:04        0:05        0:06        0:07        0:08")
+        ruler = _painted(QLabel(
+            "0:00        0:01        0:02        0:03        "
+            "0:04        0:05        0:06        0:07        0:08"))
         ruler.setStyleSheet(
             "font-size: 7pt; color: %s; letter-spacing: 1px;"
             % theme.TEXT_FAINT)
@@ -433,7 +470,7 @@ class MixerPanel(QWidget):
             root.addWidget(lane)
 
         # divider above Master
-        divider = QFrame()
+        divider = _painted(QFrame())
         divider.setFrameShape(QFrame.HLine)
         divider.setStyleSheet(
             "background: %s; height: 1px; margin: 2px 0;" % theme.BORDER_SOFT)
@@ -444,6 +481,7 @@ class MixerPanel(QWidget):
         root.addWidget(master)
 
         root.addStretch(1)
+        _paint_tree(self)
 
     # backward-compat alias used by older code/tests
     @property
@@ -457,6 +495,7 @@ class _EditorInset(QFrame):
     def __init__(self, title, controls, parent=None):
         super().__init__(parent)
         self.setObjectName("InsetPanel")
+        _painted(self)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setMinimumHeight(72)
 
@@ -506,6 +545,7 @@ class EditorPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        _painted(self)
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(10)
@@ -523,6 +563,7 @@ class TransportBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("TransportDock")
+        _painted(self)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(14, 10, 14, 10)
